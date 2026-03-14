@@ -1,0 +1,112 @@
+# ── Production acoustic PINN-FWI configuration (optimized) ──
+
+seed: 42
+project_name: "pinn_acoustic_fwi_production"
+
+data:
+  vp_path: /root/FWI/pinn_acoustic_fwi/data/processed/marmousi_vp.npy
+  observed_path: "data/synthetic/observed_acoustic.npy"
+  geometry_path: "data/synthetic/acquisition_geometry.npz"
+
+model:
+  subsample: 4
+  vp_min: 1500.0
+  vp_max: 4700.0
+
+acquisition:
+  n_shots: 16              # Increased from 8 for better coverage
+  nt: 1000
+  dt: 0.0004
+  f_peak: 8.0
+  dh: 5.0
+  src_depth_idx: 5
+  rec_depth_idx: 5
+  pad_x: 4
+  receiver_stride: 2       # Increased receiver density
+  backend: "deepwave"
+
+pinn:
+  in_dim: 4
+  n_shots: 16
+  hidden_layers: 8         # Increased depth
+  hidden_width: 256        # Increased width
+  activation: "sin"
+  first_omega_0: 30.0
+  hidden_omega_0: 30.0
+  fourier_features: false
+  n_fourier: 64
+  fourier_scale: 10.0
+  hard_constraint: "exp"
+  hard_constraint_scale: 1.5
+  hard_constraint_power: 2
+
+velocity_net:
+  hidden_layers: 8
+  hidden_width: 256
+  activation: "tanh"
+  fourier_features: true
+  n_fourier: 256           # Increased for better spatial resolution
+  fourier_scale: 8.0
+  output_activation: "sigmoid"
+
+training:
+  n_epochs: 2000           # Increased epochs
+  warmup_epochs: 200
+  lr_pinn: 5.0e-5          # Reduced for stability
+  lr_vp: 5.0e-5
+  alternating_updates: true
+  warmup_pinn_only_epochs: 200
+  pinn_steps_per_cycle: 1
+  vp_steps_per_cycle: 2
+  use_frequency_continuation: true
+  freq_start_hz: 2.0
+  freq_end_hz: 15.0        # Extended frequency range
+  freq_ramp_epochs: 1000
+  n_data_receivers: 64     # Increased data density
+  data_normalization: "rms"
+  scheduler_step: 500
+  scheduler_gamma: 0.5
+  grad_clip: 1.0
+  grad_clip_value: 0.0
+  skip_nonfinite_steps: true
+  n_collocation: 50000     # Increased collocation points
+  n_bc: 5000
+  n_ic: 5000
+  n_data_batch: 8192
+  shots_per_batch: 8
+  source_bias_ratio: 0.35
+  source_bias_sigma: 0.05
+  source_sigma: 0.02
+  source_amplitude: 1.0
+  early_stopping_patience: 200
+
+weights:
+  w_pde_start: 0.05
+  w_pde: 15.0              # Increased PDE weight
+  w_data_start: 0.5
+  w_data: 80.0             # Increased data weight
+  w_ic_start: 100.0
+  w_ic_end: 10.0
+  w_bc: 0.2
+  w_reg: 1e-3              # Increased regularization
+  w_smooth: 5e-6
+  w_tv: 5e-5
+  w_charbonnier: 5e-5
+  charbonnier_epsilon: 5.0
+  charbonnier_alpha: 0.45
+  w_bounds: 2e-3
+  causal_epsilon: 8.0
+  causal_chunks: 32
+  causal_min_weight: 5e-4
+  adaptive_data_weight: true
+  data_weight_min_scale: 0.3
+  data_weight_max_scale: 10.0
+  data_weight_beta: 0.5
+
+logging:
+  print_every: 50
+  plot_every: 100
+  checkpoint_every: 200
+  results_dir: "results"
+
+device: "auto"
