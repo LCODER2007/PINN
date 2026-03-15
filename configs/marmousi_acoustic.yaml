@@ -6,7 +6,7 @@ project_name: "pinn_acoustic_fwi"
 # ── Data paths (relative to project root) ──
 data:
   # Existing project data source (outside this package)
-  vp_path: /root/FWI/pinn_acoustic_fwi/data/processed/marmousi_vp.npy
+  vp_path: "data/processed/marmousi_vp.npy"
 
   # Package-local outputs
   observed_path: "data/synthetic/observed_acoustic.npy"

@@ -4,7 +4,7 @@ seed: 42
 project_name: "pinn_acoustic_fwi_production"
 
 data:
-  vp_path: /root/FWI/pinn_acoustic_fwi/data/processed/marmousi_vp.npy
+  vp_path: "data/processed/marmousi_vp.npy"
   observed_path: "data/synthetic/observed_acoustic.npy"
   geometry_path: "data/synthetic/acquisition_geometry.npz"
 
