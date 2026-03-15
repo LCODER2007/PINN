@@ -118,14 +118,14 @@ class ImprovedAcousticPINNFWITrainer:
         self.scheduler_pinn = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
             self.optim_pinn,
             T_0=int(train_cfg.get("scheduler_step", 500)),
-            T_mult=1.5,
+            T_mult=2,
             eta_min=float(train_cfg.get("lr_pinn", 1e-4)) * 0.01
         )
         if self.optim_vp is not None:
             self.scheduler_vp = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
                 self.optim_vp,
                 T_0=int(train_cfg.get("scheduler_step", 500)),
-                T_mult=1.5,
+                T_mult=2,
                 eta_min=float(train_cfg.get("lr_vp", 1e-4)) * 0.01
             )
 
