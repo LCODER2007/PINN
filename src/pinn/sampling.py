@@ -218,10 +218,11 @@ def sample_receiver_trace_batch(
 
     s_batch = len(shot_ids)
     r_batch = len(rec_idx)
-    tt = np.broadcast_to(t_norm[None, None, :], (s_batch, r_batch, nt))
-    xx = np.broadcast_to(rec_x_norm[None, :, None], (s_batch, r_batch, nt))
-    zz = np.broadcast_to(rec_z_norm[None, :, None], (s_batch, r_batch, nt))
-    sid = np.broadcast_to(shot_ids[:, None, None], (s_batch, r_batch, nt))
+    nt_actual = obs_traces.shape[2]  # Get actual time dimension from transposed data
+    tt = np.broadcast_to(t_norm[None, None, :], (s_batch, r_batch, nt_actual))
+    xx = np.broadcast_to(rec_x_norm[None, :, None], (s_batch, r_batch, nt_actual))
+    zz = np.broadcast_to(rec_z_norm[None, :, None], (s_batch, r_batch, nt_actual))
+    sid = np.broadcast_to(shot_ids[:, None, None], (s_batch, r_batch, nt_actual))
 
     return {
         "x": torch.tensor(xx.reshape(-1, 1), dtype=torch.float32, device=device),
@@ -231,5 +232,5 @@ def sample_receiver_trace_batch(
         "d_obs_traces": torch.tensor(obs_traces, dtype=torch.float32, device=device),
         "n_shot_batch": torch.tensor(s_batch, dtype=torch.long, device=device),
         "n_rec_batch": torch.tensor(r_batch, dtype=torch.long, device=device),
-        "n_time": torch.tensor(nt, dtype=torch.long, device=device),
+        "n_time": torch.tensor(nt_actual, dtype=torch.long, device=device),
     }
