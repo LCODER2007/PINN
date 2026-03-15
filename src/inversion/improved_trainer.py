@@ -129,7 +129,18 @@ class ImprovedAcousticPINNFWITrainer:
                 eta_min=float(train_cfg.get("lr_vp", 1e-4)) * 0.01
             )
 
-        self.loss_scheduler = LossWeightScheduler(self.cfg)
+        # Loss weight scheduler
+        weights_cfg = self.cfg["weights"]
+        self.loss_scheduler = LossWeightScheduler(
+            w_pde_start=float(weights_cfg.get("w_pde_start", 1.0)),
+            w_pde_end=float(weights_cfg.get("w_pde", 100.0)),
+            w_data_start=float(weights_cfg.get("w_data_start", 1.0)),
+            w_data_end=float(weights_cfg.get("w_data", 50.0)),
+            w_ic_start=float(weights_cfg.get("w_ic_start", 50.0)),
+            w_ic_end=float(weights_cfg.get("w_ic_end", 5.0)),
+            warmup_epochs=int(train_cfg.get("warmup_epochs", 100)),
+            total_epochs=self.n_epochs,
+        )
         self.history = {
             "loss_total": [],
             "loss_data": [],
