@@ -17,7 +17,7 @@ PROJECT_ROOT = Path(__file__).parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.data import load_marmousi_vp, model_stats
-from src.forward.acquisition import AcquisitionGeometry
+from src.forward.acquisition import AcquisitionGeometry, build_surface_acquisition
 from src.forward.acoustic_forward import generate_observed_data
 from src.pinn.acoustic_pinn import AcousticPINN, AcousticPINNConfig
 from src.pinn.velocity_net import VelocityNet, VelocityNetConfig
@@ -32,21 +32,47 @@ def setup_data(cfg: dict, project_root: Path) -> tuple[np.ndarray, AcquisitionGe
     print("STEP 1: DATA SETUP")
     print("="*60)
     
+    # Validate config
+    required_keys = ["data", "model", "acquisition"]
+    for key in required_keys:
+        if key not in cfg:
+            raise ValueError(f"Missing required config section: {key}")
+    
     # Load Marmousi
-    vp_path = resolve_path(cfg["data"]["vp_path"], project_root)
+    vp_path = resolve_path(project_root, cfg["data"]["vp_path"])
+    if not vp_path.exists():
+        raise FileNotFoundError(f"Velocity model not found: {vp_path}")
+    
     print(f"Loading Marmousi from: {vp_path}")
     vp_full = load_marmousi_vp(vp_path, subsample=int(cfg["model"]["subsample"]))
+    
+    # Validate loaded data
+    if vp_full.size == 0:
+        raise ValueError("Loaded velocity model is empty")
+    if np.any(np.isnan(vp_full)) or np.any(np.isinf(vp_full)):
+        raise ValueError("Velocity model contains NaN or Inf values")
+    
     print(f"Velocity model shape: {vp_full.shape}")
     print(f"Velocity stats: {model_stats(vp_full)}")
     
     # Setup acquisition
     acq_cfg = cfg["acquisition"]
-    geom = AcquisitionGeometry(
+    
+    # Validate acquisition config
+    if int(acq_cfg["n_shots"]) <= 0:
+        raise ValueError(f"n_shots must be > 0, got {acq_cfg['n_shots']}")
+    if int(acq_cfg["nt"]) <= 0:
+        raise ValueError(f"nt must be > 0, got {acq_cfg['nt']}")
+    if float(acq_cfg["dt"]) <= 0:
+        raise ValueError(f"dt must be > 0, got {acq_cfg['dt']}")
+    
+    vp_full_shape = vp_full.shape
+    geom = build_surface_acquisition(
+        nx=vp_full_shape[1],
+        nz=vp_full_shape[0],
         n_shots=int(acq_cfg["n_shots"]),
-        n_receivers_per_shot=None,
         nt=int(acq_cfg["nt"]),
         dt=float(acq_cfg["dt"]),
-        dh=float(acq_cfg["dh"]),
         src_depth_idx=int(acq_cfg["src_depth_idx"]),
         rec_depth_idx=int(acq_cfg["rec_depth_idx"]),
         pad_x=int(acq_cfg["pad_x"]),
@@ -55,12 +81,22 @@ def setup_data(cfg: dict, project_root: Path) -> tuple[np.ndarray, AcquisitionGe
     print(f"Acquisition geometry: {geom.n_shots} shots, {geom.n_receivers} receivers, {geom.nt} time steps")
     
     # Generate observed data
-    obs_path = resolve_path(cfg["data"]["observed_path"], project_root)
-    geom_path = resolve_path(cfg["data"]["geometry_path"], project_root)
+    obs_path = resolve_path(project_root, cfg["data"]["observed_path"])
+    geom_path = resolve_path(project_root, cfg["data"]["geometry_path"])
     
     if obs_path.exists():
         print(f"Loading observed data from: {obs_path}")
-        observed = np.load(obs_path)
+        observed = np.load(obs_path).astype(np.float32)
+        
+        # Validate observed data
+        if observed.size == 0:
+            raise ValueError("Loaded observed data is empty")
+        if np.any(np.isnan(observed)) or np.any(np.isinf(observed)):
+            raise ValueError("Observed data contains NaN or Inf values")
+        if observed.shape[0] != geom.n_shots:
+            raise ValueError(f"Observed data shots {observed.shape[0]} != geometry shots {geom.n_shots}")
+        if observed.shape[1] != geom.nt:
+            raise ValueError(f"Observed data time steps {observed.shape[1]} != geometry nt {geom.nt}")
     else:
         print(f"Generating observed data (backend: {acq_cfg['backend']})...")
         observed = generate_observed_data(
@@ -93,6 +129,21 @@ def setup_models(cfg: dict, device: str) -> tuple[AcousticPINN, VelocityNet]:
     print("\n" + "="*60)
     print("STEP 2: MODEL SETUP")
     print("="*60)
+    
+    # Validate model config
+    vp_min = float(cfg["model"]["vp_min"])
+    vp_max = float(cfg["model"]["vp_max"])
+    if vp_min >= vp_max:
+        raise ValueError(f"vp_min ({vp_min}) must be < vp_max ({vp_max})")
+    if vp_min <= 0 or vp_max <= 0:
+        raise ValueError(f"vp_min and vp_max must be positive")
+    
+    # Validate device
+    if device not in ["cpu", "cuda"]:
+        raise ValueError(f"Invalid device: {device}. Must be 'cpu' or 'cuda'")
+    if device == "cuda" and not torch.cuda.is_available():
+        print("Warning: CUDA requested but not available, falling back to CPU")
+        device = "cpu"
     
     # PINN
     pinn_cfg = AcousticPINNConfig(

@@ -207,17 +207,14 @@ class ImprovedAcousticPINNFWITrainer:
 
     def _source_fn(self, shot_id: int):
         """Create source function for PDE residual."""
-        sx = float(self.geometry.src_x[shot_id] / max(self.nx - 1, 1))
-        sz = float(self.geometry.src_z[shot_id] / max(self.nz - 1, 1))
-        
-        def src_fn(t: torch.Tensor) -> torch.Tensor:
+        def src_fn(x: torch.Tensor, z: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
             from ..forward.ricker import analytic_ricker_torch
             f_peak = float(self.cfg["acquisition"]["f_peak"])
+            # Return Ricker wavelet (independent of x, z position)
             return analytic_ricker_torch(
                 t=t,
                 f_peak=f_peak,
-                t_shift=0.0,
-                amplitude=1.0
+                delay=None
             )
         
         return src_fn
