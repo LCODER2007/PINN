@@ -23,7 +23,7 @@ from src.pinn.acoustic_pinn import AcousticPINN, AcousticPINNConfig
 from src.pinn.velocity_net import VelocityNet, VelocityNetConfig
 from src.inversion.improved_trainer import ImprovedAcousticPINNFWITrainer
 from src.utils.io import load_yaml, seed_everything, resolve_path, save_checkpoint
-from src.utils.viz import plot_velocity_model, plot_well_logs, plot_loss_history
+from src.utils.viz import plot_velocity_model, plot_well_log_comparison, plot_losses, plot_true_vs_estimated
 
 
 def setup_data(cfg: dict, project_root: Path) -> tuple[np.ndarray, AcquisitionGeometry, np.ndarray]:
@@ -204,7 +204,7 @@ def evaluate_results(trainer: ImprovedAcousticPINNFWITrainer, project_root: Path
     
     # Velocity comparison
     fig_path = trainer.fig_dir / "velocity_comparison_final.png"
-    plot_velocity_model(
+    plot_true_vs_estimated(
         vp_true=vp_true,
         vp_est=vp_est,
         save_path=fig_path,
@@ -214,7 +214,7 @@ def evaluate_results(trainer: ImprovedAcousticPINNFWITrainer, project_root: Path
     
     # Loss history
     fig_path = trainer.fig_dir / "loss_history_final.png"
-    plot_loss_history(
+    plot_losses(
         history=trainer.history,
         save_path=fig_path,
     )
@@ -222,9 +222,10 @@ def evaluate_results(trainer: ImprovedAcousticPINNFWITrainer, project_root: Path
     
     # Well logs
     fig_path = trainer.fig_dir / "well_logs_final.png"
-    plot_well_logs(
+    plot_well_log_comparison(
         vp_true=vp_true,
         vp_est=vp_est,
+        well_x_indices=[vp_true.shape[1] // 4, vp_true.shape[1] // 2, 3 * vp_true.shape[1] // 4],
         save_path=fig_path,
     )
     print(f"Saved well logs to: {fig_path}")
