@@ -1,5 +1,4 @@
-# ── Optimized acoustic PINN-FWI configuration for best convergence ──
-# This config is tuned to match the ground truth model as closely as possible
+# ── STABILIZED acoustic PINN-FWI configuration for safe convergence ──
 
 seed: 42
 project_name: "pinn_acoustic_fwi_optimized"
@@ -15,7 +14,7 @@ model:
   vp_max: 4700.0
 
 acquisition:
-  n_shots: 8                # Match observed data
+  n_shots: 8
   nt: 1000
   dt: 0.0004
   f_peak: 8.0
@@ -29,12 +28,12 @@ acquisition:
 pinn:
   in_dim: 4
   n_shots: 8
-  hidden_layers: 6          # Balanced depth
-  hidden_width: 128         # Balanced width
-  activation: "sin"         # SIREN activation for smooth solutions
+  hidden_layers: 6
+  hidden_width: 128
+  activation: "sin"
   first_omega_0: 30.0
   hidden_omega_0: 30.0
-  fourier_features: false   # Disable for SIREN
+  fourier_features: false
   n_fourier: 64
   fourier_scale: 10.0
   hard_constraint: "exp"
@@ -45,36 +44,36 @@ velocity_net:
   hidden_layers: 8
   hidden_width: 256
   activation: "tanh"
-  fourier_features: true    # Enable for better spatial resolution
-  n_fourier: 128            # Increased for better detail
+  fourier_features: true
+  n_fourier: 128
   fourier_scale: 8.0
   output_activation: "sigmoid"
 
 training:
-  n_epochs: 3000            # Increased for better convergence
-  warmup_epochs: 300        # Longer warmup
-  lr_pinn: 3.0e-4           # Higher learning rate for faster convergence
-  lr_vp: 3.0e-4             # Matched to PINN
-  alternating_updates: false # Joint updates for better coupling
-  warmup_pinn_only_epochs: 0 # Train both from start
+  n_epochs: 3000
+  warmup_epochs: 300
+  lr_pinn: 5.0e-5            # LOWERED: Prevents wavefield bouncing
+  lr_vp: 5.0e-5              # LOWERED: Prevents velocity model explosion
+  alternating_updates: false
+  warmup_pinn_only_epochs: 0
   pinn_steps_per_cycle: 1
   vp_steps_per_cycle: 1
   use_frequency_continuation: true
   freq_start_hz: 2.0
-  freq_end_hz: 8.0          # Match f_peak
-  freq_ramp_epochs: 2100    # 70% of total epochs
-  n_data_receivers: 337     # Use all receivers
+  freq_end_hz: 8.0
+  freq_ramp_epochs: 2100
+  n_data_receivers: 337
   data_normalization: "rms"
   scheduler_step: 500
   scheduler_gamma: 0.5
-  grad_clip: 1.0
+  grad_clip: 0.1             # TIGHTENED: Hard cap on gradient spikes
   grad_clip_value: 0.0
   skip_nonfinite_steps: true
-  n_collocation: 30000      # Increased physics sampling
+  n_collocation: 30000
   n_bc: 3000
   n_ic: 3000
   n_data_batch: 8192
-  shots_per_batch: 8        # Use all shots
+  shots_per_batch: 8
   source_bias_ratio: 0.35
   source_bias_sigma: 0.05
   source_sigma: 0.02
@@ -87,21 +86,21 @@ training:
   well_depth_frac: 0.75
 
 weights:
-  w_pde_start: 0.2          # Start with lower physics weight
-  w_pde: 4.0                # Moderate final physics weight
-  w_data_start: 4.0         # Start with higher data weight
-  w_data: 30.0              # Strong final data weight
-  w_ic_start: 20.0          # Strong IC enforcement
-  w_ic_end: 2.0             # Reduce after warmup
+  w_pde_start: 0.1           # LOWERED: Start gentle on physics
+  w_pde: 1.0                 # LOWERED: Don't let PDE overpower the data
+  w_data_start: 10.0         # RAISED: Force network to care about sensors early
+  w_data: 20.0               # Strong final data weight
+  w_ic_start: 20.0
+  w_ic_end: 2.0
   w_bc: 0.2
-  w_reg: 1.0e-4             # Light regularization
-  w_smooth: 5.0e-7          # Very light smoothness
-  w_tv: 5.0e-6              # Light TV regularization
-  w_charbonnier: 1.0e-5     # Light Charbonnier
+  w_reg: 1.0e-4
+  w_smooth: 1.0e-6           # Adjusted for better fault resolution
+  w_tv: 1.0e-6               # Adjusted
+  w_charbonnier: 1.0e-5
   charbonnier_epsilon: 5.0
   charbonnier_alpha: 0.45
-  w_bounds: 1.0e-4          # Light bounds penalty
-  w_well: 10.0              # Strong well constraint
+  w_bounds: 1.0e-4
+  w_well: 10.0
   causal_epsilon: 8.0
   causal_chunks: 32
   causal_min_weight: 5e-4
