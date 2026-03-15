@@ -1,0 +1,119 @@
+# ── Optimized acoustic PINN-FWI configuration for best convergence ──
+# This config is tuned to match the ground truth model as closely as possible
+
+seed: 42
+project_name: "pinn_acoustic_fwi_optimized"
+
+data:
+  vp_path: "data/processed/marmousi_vp.npy"
+  observed_path: "data/synthetic/observed_acoustic.npy"
+  geometry_path: "data/synthetic/acquisition_geometry.npz"
+
+model:
+  subsample: 4
+  vp_min: 1500.0
+  vp_max: 4700.0
+
+acquisition:
+  n_shots: 8                # Match observed data
+  nt: 1000
+  dt: 0.0004
+  f_peak: 8.0
+  dh: 5.0
+  src_depth_idx: 5
+  rec_depth_idx: 5
+  pad_x: 4
+  receiver_stride: 2
+  backend: "deepwave"
+
+pinn:
+  in_dim: 4
+  n_shots: 8
+  hidden_layers: 6          # Balanced depth
+  hidden_width: 128         # Balanced width
+  activation: "sin"         # SIREN activation for smooth solutions
+  first_omega_0: 30.0
+  hidden_omega_0: 30.0
+  fourier_features: false   # Disable for SIREN
+  n_fourier: 64
+  fourier_scale: 10.0
+  hard_constraint: "exp"
+  hard_constraint_scale: 1.5
+  hard_constraint_power: 2
+
+velocity_net:
+  hidden_layers: 8
+  hidden_width: 256
+  activation: "tanh"
+  fourier_features: true    # Enable for better spatial resolution
+  n_fourier: 128            # Increased for better detail
+  fourier_scale: 8.0
+  output_activation: "sigmoid"
+
+training:
+  n_epochs: 3000            # Increased for better convergence
+  warmup_epochs: 300        # Longer warmup
+  lr_pinn: 3.0e-4           # Higher learning rate for faster convergence
+  lr_vp: 3.0e-4             # Matched to PINN
+  alternating_updates: false # Joint updates for better coupling
+  warmup_pinn_only_epochs: 0 # Train both from start
+  pinn_steps_per_cycle: 1
+  vp_steps_per_cycle: 1
+  use_frequency_continuation: true
+  freq_start_hz: 2.0
+  freq_end_hz: 8.0          # Match f_peak
+  freq_ramp_epochs: 2100    # 70% of total epochs
+  n_data_receivers: 337     # Use all receivers
+  data_normalization: "rms"
+  scheduler_step: 500
+  scheduler_gamma: 0.5
+  grad_clip: 1.0
+  grad_clip_value: 0.0
+  skip_nonfinite_steps: true
+  n_collocation: 30000      # Increased physics sampling
+  n_bc: 3000
+  n_ic: 3000
+  n_data_batch: 8192
+  shots_per_batch: 8        # Use all shots
+  source_bias_ratio: 0.35
+  source_bias_sigma: 0.05
+  source_sigma: 0.02
+  source_amplitude: 1.0
+  early_stopping_patience: 300
+  active_receiver_rms_ratio: 0.02
+  data_batch_all_shots: true
+  use_well_prior: true
+  well_position_fracs: [0.5]
+  well_depth_frac: 0.75
+
+weights:
+  w_pde_start: 0.2          # Start with lower physics weight
+  w_pde: 4.0                # Moderate final physics weight
+  w_data_start: 4.0         # Start with higher data weight
+  w_data: 30.0              # Strong final data weight
+  w_ic_start: 20.0          # Strong IC enforcement
+  w_ic_end: 2.0             # Reduce after warmup
+  w_bc: 0.2
+  w_reg: 1.0e-4             # Light regularization
+  w_smooth: 5.0e-7          # Very light smoothness
+  w_tv: 5.0e-6              # Light TV regularization
+  w_charbonnier: 1.0e-5     # Light Charbonnier
+  charbonnier_epsilon: 5.0
+  charbonnier_alpha: 0.45
+  w_bounds: 1.0e-4          # Light bounds penalty
+  w_well: 10.0              # Strong well constraint
+  causal_epsilon: 8.0
+  causal_chunks: 32
+  causal_min_weight: 5e-4
+  adaptive_data_weight: true
+  data_weight_min_scale: 0.3
+  data_weight_max_scale: 10.0
+  data_weight_beta: 0.5
+
+logging:
+  print_every: 50
+  plot_every: 100
+  checkpoint_every: 500
+  results_dir: "results"
+
+device: "auto"
