@@ -1,7 +1,7 @@
 # Issues Fixed - Comprehensive Report
 
 ## Summary
-Fixed **4 CRITICAL issues** and added **comprehensive error handling** to make the project production-ready.
+Fixed **5 CRITICAL issues** and added **comprehensive error handling** to make the project production-ready.
 
 ---
 
@@ -129,9 +129,42 @@ return analytic_ricker_torch(
 
 ---
 
+### 5. ❌ Broadcasting Error in sample_receiver_trace_batch
+**File**: `src/pinn/sampling.py` (line 221)
+
+**Problem**:
+```python
+# WRONG - using original nt from observed.shape[1] instead of transposed shape
+n_shots, nt, n_rec_obs = observed.shape  # nt = 1000 (time dimension)
+...
+obs_traces = observed[shot_ids][:, :, rec_idx].transpose(0, 2, 1)  # Shape: (s_batch, r_batch, 1000)
+...
+tt = np.broadcast_to(t_norm[None, None, :], (s_batch, r_batch, nt))  # ❌ nt=1000 but trying to broadcast to (1, 24, 337)
+```
+
+**Root Cause**: After transpose, `obs_traces` has shape `(s_batch, r_batch, 1000)` but the code was using the original `nt` from `observed.shape[1]` which was being interpreted as 337 (receiver count) in the broadcast target.
+
+**Fix**:
+```python
+# CORRECT - get actual time dimension from transposed data
+obs_traces = observed[shot_ids][:, :, rec_idx].transpose(0, 2, 1).astype(np.float32)
+
+s_batch = len(shot_ids)
+r_batch = len(rec_idx)
+nt_actual = obs_traces.shape[2]  # Get actual time dimension from transposed data
+tt = np.broadcast_to(t_norm[None, None, :], (s_batch, r_batch, nt_actual))
+xx = np.broadcast_to(rec_x_norm[None, :, None], (s_batch, r_batch, nt_actual))
+zz = np.broadcast_to(rec_z_norm[None, :, None], (s_batch, r_batch, nt_actual))
+sid = np.broadcast_to(shot_ids[:, None, None], (s_batch, r_batch, nt_actual))
+```
+
+**Impact**: Would cause ValueError: operands could not be broadcast together with remapped shapes during training.
+
+---
+
 ## IMPROVEMENTS ADDED
 
-### 5. ✅ Comprehensive Error Handling
+### 6. ✅ Comprehensive Error Handling
 
 #### Config Validation
 ```python
@@ -206,6 +239,7 @@ if observed.shape[1] != geom.nt:
 |------|---------|----------|
 | `run_full_pipeline.py` | Fixed resolve_path args, AcquisitionGeometry init, added validation | CRITICAL |
 | `src/inversion/improved_trainer.py` | Fixed source function signature and parameters | CRITICAL |
+| `src/pinn/sampling.py` | Fixed broadcasting error in sample_receiver_trace_batch | CRITICAL |
 | `configs/production.yaml` | Fixed absolute paths to relative paths | HIGH |
 | `configs/fastdev.yaml` | Fixed absolute paths to relative paths | HIGH |
 | `configs/marmousi_acoustic.yaml` | Fixed absolute paths to relative paths | HIGH |
@@ -257,6 +291,9 @@ python run_full_pipeline.py --config fastdev.yaml --device cuda
 ## COMMIT HISTORY
 
 ```
+53c36d9 Fix: Broadcasting error in sample_receiver_trace_batch - use actual time dimension from transposed data
+c74a261 Fix: CosineAnnealingWarmRestarts T_mult must be integer
+418c4e3 Remove: Delete mismatched synthetic data files
 170d435 Fix: Critical issues in run_full_pipeline.py and improved_trainer.py
 7810db9 Fix: Use relative paths in all config files for portability
 6a7b473 Fix: Correct visualization function imports and calls
