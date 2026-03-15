@@ -1,7 +1,7 @@
 # Issues Fixed - Comprehensive Report
 
 ## Summary
-Fixed **5 CRITICAL issues** and added **comprehensive error handling** to make the project production-ready.
+Fixed **6 CRITICAL issues** and added **comprehensive error handling** to make the project production-ready.
 
 ---
 
@@ -162,9 +162,54 @@ sid = np.broadcast_to(shot_ids[:, None, None], (s_batch, r_batch, nt_actual))
 
 ---
 
+### 6. ❌ LossWeightScheduler Initialization Type Error
+**File**: `src/inversion/improved_trainer.py` (line 132)
+
+**Problem**:
+```python
+# WRONG - passing entire config dict to dataclass expecting individual float parameters
+self.loss_scheduler = LossWeightScheduler(self.cfg)
+```
+
+**LossWeightScheduler Dataclass** expects individual parameters:
+```python
+@dataclass
+class LossWeightScheduler:
+    w_pde_start: float = 1.0
+    w_pde_end: float = 100.0
+    w_data_start: float = 1.0
+    w_data_end: float = 50.0
+    w_ic_start: float = 50.0
+    w_ic_end: float = 5.0
+    warmup_epochs: int = 100
+    total_epochs: int = 1000
+```
+
+**Root Cause**: When the scheduler tried to compute `self.w_pde_end - self.w_pde_start`, it was trying to subtract a dict from a float because `self.w_pde_end` was the entire config dict instead of a float value.
+
+**Fix**:
+```python
+# CORRECT - extract and pass individual parameters with proper type conversion
+weights_cfg = self.cfg["weights"]
+self.loss_scheduler = LossWeightScheduler(
+    w_pde_start=float(weights_cfg.get("w_pde_start", 1.0)),
+    w_pde_end=float(weights_cfg.get("w_pde", 100.0)),
+    w_data_start=float(weights_cfg.get("w_data_start", 1.0)),
+    w_data_end=float(weights_cfg.get("w_data", 50.0)),
+    w_ic_start=float(weights_cfg.get("w_ic_start", 50.0)),
+    w_ic_end=float(weights_cfg.get("w_ic_end", 5.0)),
+    warmup_epochs=int(train_cfg.get("warmup_epochs", 100)),
+    total_epochs=self.n_epochs,
+)
+```
+
+**Impact**: Would cause TypeError: unsupported operand type(s) for -: 'float' and 'dict' during training initialization.
+
+---
+
 ## IMPROVEMENTS ADDED
 
-### 6. ✅ Comprehensive Error Handling
+### 7. ✅ Comprehensive Error Handling
 
 #### Config Validation
 ```python
@@ -238,7 +283,7 @@ if observed.shape[1] != geom.nt:
 | File | Changes | Severity |
 |------|---------|----------|
 | `run_full_pipeline.py` | Fixed resolve_path args, AcquisitionGeometry init, added validation | CRITICAL |
-| `src/inversion/improved_trainer.py` | Fixed source function signature and parameters | CRITICAL |
+| `src/inversion/improved_trainer.py` | Fixed source function signature, parameters, and LossWeightScheduler init | CRITICAL |
 | `src/pinn/sampling.py` | Fixed broadcasting error in sample_receiver_trace_batch | CRITICAL |
 | `configs/production.yaml` | Fixed absolute paths to relative paths | HIGH |
 | `configs/fastdev.yaml` | Fixed absolute paths to relative paths | HIGH |
@@ -291,6 +336,7 @@ python run_full_pipeline.py --config fastdev.yaml --device cuda
 ## COMMIT HISTORY
 
 ```
+1267437 Fix: LossWeightScheduler initialization - pass individual parameters instead of entire config dict
 53c36d9 Fix: Broadcasting error in sample_receiver_trace_batch - use actual time dimension from transposed data
 c74a261 Fix: CosineAnnealingWarmRestarts T_mult must be integer
 418c4e3 Remove: Delete mismatched synthetic data files
